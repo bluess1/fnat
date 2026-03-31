@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Five Nights at TMA</title>
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Special+Elite&display=swap" rel="stylesheet"/>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #000;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      width: 100vw;
+      cursor: none;
+    }
+    #game-container { position: relative; }
+
+    /* Custom cursor */
+    #cursor {
+      position: fixed;
+      width: 10px; height: 10px;
+      border: 2px solid #8b0000;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9999;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 6px #8b0000;
+    }
+    /* Scanlines */
+    #scanlines {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none; z-index: 100;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px
+      );
+    }
+    /* Vignette */
+    #vignette {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none; z-index: 99;
+      background: radial-gradient(ellipse at center,
+        transparent 45%, rgba(0,0,0,0.55) 75%, rgba(0,0,0,0.92) 100%
+      );
+    }
+  </style>
+</head>
+<body>
+  <div id="cursor"></div>
+  <div id="scanlines"></div>
+  <div id="vignette"></div>
+  <div id="game-container"></div>
+
+  <!-- Phaser -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
+
+  <!-- Utils (load first) -->
+  <script src="utils/constants.js"></script>
+
+  <!-- Scenes -->
+  <script src="scenes/HomeScene.js"></script>
+  <script src="scenes/NightOneScene.js"></script>
+
+  <!-- Boot -->
+  <script src="main.js"></script>
+
+  <script>
+    const cursor = document.getElementById('cursor');
+    document.addEventListener('mousemove', e => {
+      cursor.style.left = e.clientX + 'px';
+      cursor.style.top  = e.clientY + 'px';
+    });
+  </script>
+</body>
+</html>
