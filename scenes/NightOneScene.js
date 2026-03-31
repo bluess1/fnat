@@ -704,24 +704,18 @@ class NightOneScene extends Phaser.Scene {
       const currentAdj = ROOM_GRAPH[currentRoom];
       if (!currentAdj || currentAdj.length === 0) break;
       
-      // Prefer rooms closer to target
-      const distToTarget = this._distToBase();
-      const currentDist = distToTarget[currentRoom] ?? 999;
+      // If adjacent includes target, go directly there
+      if (currentAdj.includes(targetRoom)) {
+        currentRoom = targetRoom;
+        break;
+      }
       
-      // Find adjacent rooms that move closer to target
-      const betterRooms = currentAdj.filter(r => {
-        const rDist = distToTarget[r];
-        // Can't move to BASE from lure
-        if (r === ROOM.BASE) return false;
-        // Prefer rooms that are closer to the target room
-        if (targetRoom === ROOM.BASE) return true;
-        return rDist !== undefined && rDist < currentDist;
-      });
-      
-      if (betterRooms.length > 0) {
-        currentRoom = betterRooms[Phaser.Math.Between(0, betterRooms.length - 1)];
+      // Find path toward target room (BFS to find shortest path)
+      const path = this._findPathTo(currentRoom, targetRoom);
+      if (path && path.length > 1) {
+        currentRoom = path[1]; // Move to next step in path
       } else {
-        // If no better path, pick random safe room
+        // If no path found, pick random adjacent (not BASE)
         const safe = currentAdj.filter(r => r !== ROOM.BASE);
         if (safe.length > 0) {
           currentRoom = safe[Phaser.Math.Between(0, safe.length - 1)];
@@ -735,6 +729,30 @@ class NightOneScene extends Phaser.Scene {
     this._updateLocationText();
     this._updateMapDot();
     if (this.camOpen) this._refreshCamFeed();
+  }
+
+  // BFS to find shortest path from start to target
+  _findPathTo(start, target) {
+    const queue = [[start]];
+    const visited = new Set([start]);
+    
+    while (queue.length > 0) {
+      const path = queue.shift();
+      const current = path[path.length - 1];
+      
+      if (current === target) return path;
+      
+      const adjacent = ROOM_GRAPH[current];
+      if (!adjacent) continue;
+      
+      for (const next of adjacent) {
+        if (!visited.has(next)) {
+          visited.add(next);
+          queue.push([...path, next]);
+        }
+      }
+    }
+    return null;
   }
 
   // AI movement step
