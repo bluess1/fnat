@@ -690,12 +690,18 @@ class NightOneScene extends Phaser.Scene {
     const adjacent = ROOM_GRAPH[this.characterRoom];
     if (!adjacent || adjacent.length === 0) return;
 
-    // Filter out BASE (10) to prevent immediate jumpscare from click
-    const safeRooms = adjacent.filter(r => r !== ROOM.BASE);
-    if (safeRooms.length === 0) return;
+    // If cameras are open and viewing a specific room (not BASE), creature cannot move into that room
+    // If cameras are closed, creature can move anywhere including BASE
+    let allowedRooms;
+    if (this.camOpen && this.activeCam !== ROOM.BASE) {
+      allowedRooms = adjacent.filter(r => r !== this.activeCam);
+    } else {
+      allowedRooms = adjacent;
+    }
+    
+    if (allowedRooms.length === 0) return;
 
-    // Move to random adjacent room (not BASE)
-    this.characterRoom = safeRooms[Phaser.Math.Between(0, safeRooms.length - 1)];
+    this.characterRoom = allowedRooms[Phaser.Math.Between(0, allowedRooms.length - 1)];
     this.playerWatchStart = 0;
     this.stareTriggered = false;
 
