@@ -22,6 +22,12 @@ class NightOneScene extends Phaser.Scene {
     this.aiTimer         = null;
     this.loadedTextures  = new Set();
 
+    // Camera feed dimensions
+    this.FEED_X = 16;
+    this.FEED_Y = 52;
+    this.FEED_W = 640;
+    this.FEED_H = 430;
+
     // Stare mechanic
     this.isStaring        = false;
     this.stareTriggered   = false;
@@ -197,7 +203,7 @@ class NightOneScene extends Phaser.Scene {
     this.camPanel.add(backdrop);
 
     // ── Feed ──────────────────────────────────
-    const FEED_X = 16, FEED_Y = 52, FEED_W = 640, FEED_H = 430;
+    const FEED_X = this.FEED_X, FEED_Y = this.FEED_Y, FEED_W = this.FEED_W, FEED_H = this.FEED_H;
     const feedCx = FEED_X + FEED_W / 2;
     const feedCy = FEED_Y + FEED_H / 2;
 
@@ -247,6 +253,11 @@ class NightOneScene extends Phaser.Scene {
       y: { from: FEED_Y, to: FEED_Y + FEED_H },
       duration: 2800, repeat: -1, ease: 'Linear',
     });
+
+    // Static glitch line that moves randomly
+    this.glitchLine = this.add.rectangle(FEED_X, FEED_Y, FEED_W, 2, 0xffffff, 0);
+    this.camPanel.add(this.glitchLine);
+    this._startGlitchEffects();
 
     // Cam label
     this.camLabel = this.add.text(FEED_X + 8, FEED_Y + 8, ROOMS[0], {
@@ -547,6 +558,45 @@ class NightOneScene extends Phaser.Scene {
     this.time.delayedCall(140, () => { if (this.camNoiseImg) this.camNoiseImg.setAlpha(0.3); });
   }
 
+  // Random glitch effects on camera feed
+  _startGlitchEffects() {
+    this.time.addEvent({
+      delay: Phaser.Math.Between(3000, 8000),
+      loop: true,
+      callback: () => {
+        if (!this.camOpen || this.nightOver) return;
+        
+        // Random glitch flash
+        if (Math.random() < 0.3) {
+          this.glitchLine.setY(Phaser.Math.Between(this.FEED_Y + 50, this.FEED_Y + this.FEED_H - 50));
+          this.glitchLine.setAlpha(Phaser.Math.FloatBetween(0.3, 0.7));
+          this.glitchLine.setFillStyle(0xffffff);
+          
+          this.tweens.add({
+            targets: this.glitchLine,
+            alpha: 0,
+            duration: Phaser.Math.Between(50, 150),
+            onComplete: () => {
+              this.glitchLine.setY(this.FEED_Y);
+              this.glitchLine.setAlpha(0);
+            }
+          });
+        }
+        
+        // Random color tint shift
+        if (Math.random() < 0.2) {
+          const tintColors = [0x00ff00, 0x00ffff, 0xff00ff, 0xffff00];
+          const color = tintColors[Phaser.Math.Between(0, tintColors.length - 1)];
+          this.camTint.setFillStyle(color, 0.15);
+          this.time.delayedCall(100, () => {
+            if (this.camTint) this.camTint.setFillStyle(0x003300, 0.08);
+          });
+        }
+      },
+      callbackScope: this,
+    });
+  }
+
   // ════════════════════════════════════════════
   //  LOGIC
   // ════════════════════════════════════════════
@@ -572,7 +622,55 @@ class NightOneScene extends Phaser.Scene {
       this._drawMapNode(n.bg, n.nx, n.ny, n.NODE_W, n.NODE_H, n.idx === index, false);
       n.label.setColor(n.idx === index ? '#00ff88' : '#778899');
     });
+
+    // Check if creature is in this room - trigger glitch effect
+    if (this.aiActive && this.characterRoom === index && index !== ROOM.BASE) {
+      this._triggerGlitchDisappear();
+    }
+
     this._refreshCamFeed();
+  }
+
+  // Glitch effect when player catches creature in a room
+  _triggerGlitchDisappear() {
+    // Store current room before moving
+    const oldRoom = this.characterRoom;
+
+    // Glitch effects
+    this.cameras.main.shake(200, 0.015);
+    
+    // Heavy camera noise during glitch
+    if (this.camOpen) {
+      this.camNoiseImg.setAlpha(1);
+    }
+    
+    // Delay before creature "disappears" to another room
+    const delayMs = Phaser.Math.Between(1000, 2000);
+    this.time.delayedCall(delayMs, () => {
+      const adjacent = ROOM_GRAPH[oldRoom];
+      if (adjacent && adjacent.length > 0) {
+        // Filter out current room (player is watching) and BASE
+        const safeRooms = adjacent.filter(r => r !== ROOM.BASE && r !== this.activeCam);
+        if (safeRooms.length > 0) {
+          this.characterRoom = safeRooms[Phaser.Math.Between(0, safeRooms.length - 1)];
+        } else if (adjacent.includes(ROOM.BASE)) {
+          this.characterRoom = ROOM.BASE;
+        } else {
+          this.characterRoom = adjacent[Phaser.Math.Between(0, adjacent.length - 1)];
+        }
+      }
+      
+      this.playerWatchStart = 0;
+      this.stareTriggered = false;
+      this._updateLocationText();
+      this._updateMapDot();
+      
+      // Flash after creature moves
+      this.cameras.main.flash(100, 255, 255, 255);
+      this.time.delayedCall(80, () => { 
+        if (this.camNoiseImg) this.camNoiseImg.setAlpha(0.3); 
+      });
+    });
   }
 
   _activateLure(roomIndex) {
@@ -593,17 +691,47 @@ class NightOneScene extends Phaser.Scene {
     });
   }
 
+  // Move creature 1-2 steps toward target room (not instant teleport)
   _moveLure(targetRoom) {
-    const path = ROOM_GRAPH[this.characterRoom];
-    if (!path || path.length === 0) return;
-    if (path.includes(targetRoom)) {
-      this.characterRoom = targetRoom;
-    } else {
-      const safe = path.filter(r => r !== ROOM.BASE);
-      if (safe.length) this.characterRoom = safe[Phaser.Math.Between(0, safe.length - 1)];
+    const adjacent = ROOM_GRAPH[this.characterRoom];
+    if (!adjacent || adjacent.length === 0) return;
+
+    // Find a path toward target room, move only 1-2 steps
+    const steps = Phaser.Math.Between(1, 2);
+    let currentRoom = this.characterRoom;
+    
+    for (let i = 0; i < steps; i++) {
+      const currentAdj = ROOM_GRAPH[currentRoom];
+      if (!currentAdj || currentAdj.length === 0) break;
+      
+      // Prefer rooms closer to target
+      const distToTarget = this._distToBase();
+      const currentDist = distToTarget[currentRoom] ?? 999;
+      
+      // Find adjacent rooms that move closer to target
+      const betterRooms = currentAdj.filter(r => {
+        const rDist = distToTarget[r];
+        // Can't move to BASE from lure
+        if (r === ROOM.BASE) return false;
+        // Prefer rooms that are closer to the target room
+        if (targetRoom === ROOM.BASE) return true;
+        return rDist !== undefined && rDist < currentDist;
+      });
+      
+      if (betterRooms.length > 0) {
+        currentRoom = betterRooms[Phaser.Math.Between(0, betterRooms.length - 1)];
+      } else {
+        // If no better path, pick random safe room
+        const safe = currentAdj.filter(r => r !== ROOM.BASE);
+        if (safe.length > 0) {
+          currentRoom = safe[Phaser.Math.Between(0, safe.length - 1)];
+        }
+      }
     }
+    
+    this.characterRoom = currentRoom;
     this.playerWatchStart = 0;
-    this.stareTriggered   = false;
+    this.stareTriggered = false;
     this._updateLocationText();
     this._updateMapDot();
     if (this.camOpen) this._refreshCamFeed();
