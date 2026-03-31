@@ -32,7 +32,7 @@ class NightOneScene extends Phaser.Scene {
     this.isStaring        = false;
     this.stareTriggered   = false;
     this.playerWatchStart = 0;
-    this.STARE_THRESHOLD  = 1500;
+    this.STARE_THRESHOLD  = 500;
   }
 
   // ════════════════════════════════════════════

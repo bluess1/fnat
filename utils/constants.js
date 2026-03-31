@@ -9,9 +9,9 @@ const NIGHT_DURATION_MS  = 180_000;
 const AI_SPAWN_DELAY_MS  = 30_000;
 
 const AI_MOVE_INTERVAL = {
-  1: 12000,
-  2: 7000,
-  3: 4000,
+  1: 5000,
+  2: 3500,
+  3: 2000,
 };
 
 const ROOMS = [
