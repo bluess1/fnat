@@ -221,7 +221,7 @@ class NightOneScene extends Phaser.Scene {
     this.camPanel.add(feedBorder);
 
     // Feed image — masked to feed box so it never bleeds out
-    this.camFeedImg = this.add.image(feedCx, feedCy, 'cam_room_0').setDisplaySize(FEED_W, FEED_H);
+    this.camFeedImg = this.add.image(feedCx, feedCy, 'cam_room_0').setScale(0.5); // Start scaled down
     const maskShape = this.make.graphics({ add: false });
     maskShape.fillStyle(0xffffff);
     maskShape.fillRect(FEED_X, FEED_Y, FEED_W, FEED_H);
@@ -539,6 +539,11 @@ class NightOneScene extends Phaser.Scene {
     }
 
     this.camFeedImg.setTexture(texKey);
+    
+    // Images appear to be larger than feed, scale to 50% to fit
+    this.camFeedImg.setScale(0.5);
+    this.camFeedImg.setPosition(this.FEED_X + this.FEED_W / 2, this.FEED_Y + this.FEED_H / 2);
+    
     this.camLabel.setText(ROOMS[camIdx]);
 
     // Warning + watch timer
