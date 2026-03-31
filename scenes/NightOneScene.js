@@ -46,18 +46,18 @@ class NightOneScene extends Phaser.Scene {
       this.load.image(`room_creature_${i - 1}`, `assets/img${i}.2.png`);
     }
 
-    // Fallback generated textures (used when photos are missing)
+    // Fallback generated textures (brighter)
     const palettes = [
-      { bg: 0x050a10, line: 0x0a2030 },
-      { bg: 0x0f0505, line: 0x301010 },
-      { bg: 0x080d08, line: 0x103010 },
-      { bg: 0x0d0d05, line: 0x302800 },
-      { bg: 0x100508, line: 0x300a12 },
-      { bg: 0x050d10, line: 0x0a2835 },
-      { bg: 0x0a0505, line: 0x280808 },
-      { bg: 0x060810, line: 0x0d1830 },
-      { bg: 0x08080d, line: 0x15152a },
-      { bg: 0x0a0808, line: 0x201010 },
+      { bg: 0x2a2a3a, line: 0x404060 },
+      { bg: 0x2a2020, line: 0x504040 },
+      { bg: 0x202a20, line: 0x405040 },
+      { bg: 0x2a2a20, line: 0x504800 },
+      { bg: 0x302025, line: 0x502030 },
+      { bg: 0x202a2a, line: 0x304050 },
+      { bg: 0x2a2020, line: 0x403030 },
+      { bg: 0x202530, line: 0x304050 },
+      { bg: 0x202030, line: 0x353550 },
+      { bg: 0x2a2020, line: 0x403030 },
     ];
     for (let i = 0; i < 10; i++) {
       const g = this.make.graphics({ add: false });
@@ -105,20 +105,19 @@ class NightOneScene extends Phaser.Scene {
     this.ambienceSound.play();
     this.playSound = this.sound.add('playsound', { loop: false, volume: 0.8 });
 
-    this.time.delayedCall(AI_SPAWN_DELAY_MS, () => {
-      this.aiActive = true;
-      this.aiTimer = this.time.addEvent({
-        delay: AI_MOVE_INTERVAL[this.nightNum],
-        loop: true,
-        callback: this._aiStep,
-        callbackScope: this,
-      });
-    });
+    // Creature is active from the start, but only moves on click
+    this.aiActive = true;
 
     this.time.addEvent({
       delay: NIGHT_DURATION_MS,
       callback: this._nightComplete,
       callbackScope: this,
+    });
+
+    // Click handler for creature movement
+    this.input.on('pointerdown', (pointer) => {
+      if (this.nightOver) return;
+      this._triggerCreatureMove();
     });
 
     this.cameras.main.fadeIn(800, 0, 0, 0);
@@ -129,15 +128,15 @@ class NightOneScene extends Phaser.Scene {
   // ════════════════════════════════════════════
   _buildBaseView() {
     this.add.image(GAME_W / 2, GAME_H / 2, 'base').setDisplaySize(GAME_W, GAME_H);
-    this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x000000, 0.4);
+    this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x000000, 0.2);
     const scan = this.add.graphics();
     for (let y = 0; y < GAME_H; y += 4) {
-      scan.fillStyle(0x000000, 0.13);
+      scan.fillStyle(0x000000, 0.06);
       scan.fillRect(0, y, GAME_W, 1);
     }
     const vig = this.add.graphics();
-    for (let r = 0; r < 8; r++) {
-      vig.fillStyle(0x000000, 0.11);
+    for (let r = 0; r < 6; r++) {
+      vig.fillStyle(0x000000, 0.04);
       vig.fillEllipse(GAME_W / 2, GAME_H / 2, GAME_W * (0.55 + r * 0.09), GAME_H * (0.55 + r * 0.09));
     }
   }
@@ -222,8 +221,8 @@ class NightOneScene extends Phaser.Scene {
     this.camFeedImg.setMask(maskShape.createGeometryMask());
     this.camPanel.add(this.camFeedImg);
 
-    // Night-vision tint
-    this.camTint = this.add.rectangle(feedCx, feedCy, FEED_W, FEED_H, 0x001a00, 0.18);
+    // Night-vision tint (brighter)
+    this.camTint = this.add.rectangle(feedCx, feedCy, FEED_W, FEED_H, 0x003300, 0.08);
     this.camPanel.add(this.camTint);
 
     // Noise overlay
@@ -231,16 +230,16 @@ class NightOneScene extends Phaser.Scene {
       .setDisplaySize(FEED_W, FEED_H).setAlpha(0.3).setBlendMode(Phaser.BlendModes.ADD);
     this.camPanel.add(this.camNoiseImg);
 
-    // Scanlines
+    // Scanlines (lighter)
     const feedScan = this.add.graphics();
     for (let y = FEED_Y; y < FEED_Y + FEED_H; y += 3) {
-      feedScan.fillStyle(0x000000, 0.16);
+      feedScan.fillStyle(0x000000, 0.06);
       feedScan.fillRect(FEED_X, y, FEED_W, 1);
     }
     this.camPanel.add(feedScan);
 
-    // Rolling scan line
-    this.scanLine = this.add.rectangle(FEED_X, FEED_Y, FEED_W, 3, 0x00ff88, 0.07);
+    // Rolling scan line (lighter)
+    this.scanLine = this.add.rectangle(FEED_X, FEED_Y, FEED_W, 3, 0x00ff88, 0.04);
     this.camPanel.add(this.scanLine);
     this.tweens.add({
       targets: this.scanLine,
@@ -682,6 +681,32 @@ class NightOneScene extends Phaser.Scene {
         this.cooldownBar.strokeRect(barX, barY, barW, 4);
       },
     });
+  }
+
+  // Click handler for creature movement
+  _triggerCreatureMove() {
+    if (!this.aiActive || this.isStaring) return;
+
+    const adjacent = ROOM_GRAPH[this.characterRoom];
+    if (!adjacent || adjacent.length === 0) return;
+
+    // Filter out BASE (10) to prevent immediate jumpscare from click
+    const safeRooms = adjacent.filter(r => r !== ROOM.BASE);
+    if (safeRooms.length === 0) return;
+
+    // Move to random adjacent room (not BASE)
+    this.characterRoom = safeRooms[Phaser.Math.Between(0, safeRooms.length - 1)];
+    this.playerWatchStart = 0;
+    this.stareTriggered = false;
+
+    if (this.characterRoom === ROOM.BASE) {
+      this._triggerJumpscare();
+      return;
+    }
+
+    this._updateLocationText();
+    this._updateMapDot();
+    if (this.camOpen) this._refreshCamFeed();
   }
 
   // ════════════════════════════════════════════

@@ -32,26 +32,21 @@ class HomeScene extends Phaser.Scene {
   }
 
   _buildBg() {
-    // Deep dark gradient
+    // Brighter gradient
     const bg = this.add.graphics();
-    bg.fillGradientStyle(0x000000, 0x000000, 0x080510, 0x080510, 1);
+    bg.fillGradientStyle(0x1a1a2a, 0x1a1a2a, 0x2a2a3a, 0x2a2a3a, 1);
     bg.fillRect(0, 0, GAME_W, GAME_H);
 
     // Subtle grid
     const grid = this.add.graphics();
-    grid.lineStyle(1, 0x111122, 0.4);
+    grid.lineStyle(1, 0x333355, 0.3);
     for (let x = 0; x < GAME_W; x += 60) grid.lineBetween(x, 0, x, GAME_H);
     for (let y = 0; y < GAME_H; y += 60) grid.lineBetween(0, y, GAME_W, y);
 
-    // Noise overlay
-    this.add.image(GAME_W / 2, GAME_H / 2, 'noise')
-        .setAlpha(0.06)
-        .setBlendMode(Phaser.BlendModes.ADD);
-
-    // Faint horizontal scan lines baked in
+    // Faint horizontal scan lines
     const scan = this.add.graphics();
     for (let y = 0; y < GAME_H; y += 4) {
-      scan.fillStyle(0x000000, 0.15);
+      scan.fillStyle(0x000000, 0.06);
       scan.fillRect(0, y, GAME_W, 1);
     }
   }
@@ -268,12 +263,11 @@ class HomeScene extends Phaser.Scene {
   }
 
   _buildVignette() {
-    // Drawn last so it's on top
+    // Lighter vignette
     const v = this.add.graphics();
-    // Radial vignette using concentric filled circles with decreasing alpha
-    for (let r = 0; r < 8; r++) {
-      const radius = GAME_W * (0.5 + r * 0.07);
-      v.fillStyle(0x000000, 0.09);
+    for (let r = 0; r < 6; r++) {
+      const radius = GAME_W * (0.5 + r * 0.08);
+      v.fillStyle(0x000000, 0.04);
       v.fillEllipse(GAME_W / 2, GAME_H / 2, radius, radius * (GAME_H / GAME_W));
     }
   }
