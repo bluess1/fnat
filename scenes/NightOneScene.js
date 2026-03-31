@@ -105,19 +105,20 @@ class NightOneScene extends Phaser.Scene {
     this.ambienceSound.play();
     this.playSound = this.sound.add('playsound', { loop: false, volume: 0.8 });
 
-    // Creature is active from the start, but only moves on click
-    this.aiActive = true;
+    this.time.delayedCall(AI_SPAWN_DELAY_MS, () => {
+      this.aiActive = true;
+      this.aiTimer = this.time.addEvent({
+        delay: AI_MOVE_INTERVAL[this.nightNum],
+        loop: true,
+        callback: this._aiStep,
+        callbackScope: this,
+      });
+    });
 
     this.time.addEvent({
       delay: NIGHT_DURATION_MS,
       callback: this._nightComplete,
       callbackScope: this,
-    });
-
-    // Click handler for creature movement
-    this.input.on('pointerdown', (pointer) => {
-      if (this.nightOver) return;
-      this._triggerCreatureMove();
     });
 
     this.cameras.main.fadeIn(800, 0, 0, 0);
@@ -608,22 +609,52 @@ class NightOneScene extends Phaser.Scene {
     if (this.camOpen) this._refreshCamFeed();
   }
 
+  // AI movement step
   _aiStep() {
     if (this.nightOver || !this.aiActive || this.isStaring) return;
     if (this.isLured) return;
 
+    // After spawn delay (30s), random chance to "appear" in viewed room
+    const timeSinceSpawn = this.time.now - this.startTime - AI_SPAWN_DELAY_MS;
+    if (timeSinceSpawn >= 0) {
+      // 40% chance to appear in viewed room (only if not already there)
+      if (this.camOpen && this.activeCam !== this.characterRoom && Math.random() < 0.4) {
+        // Teleport to the room player is viewing (but not BASE)
+        if (this.activeCam !== ROOM.BASE) {
+          this.characterRoom = this.activeCam;
+          this.playerWatchStart = 0;
+          this.stareTriggered = false;
+          this._updateLocationText();
+          this._updateMapDot();
+          this._refreshCamFeed();
+          return;
+        }
+      }
+    }
+
     const adjacent = ROOM_GRAPH[this.characterRoom];
     if (!adjacent || adjacent.length === 0) return;
 
+    // If cameras are open and viewing a room (not BASE), don't move into that room
+    let allowedRooms;
+    if (this.camOpen && this.activeCam !== ROOM.BASE) {
+      allowedRooms = adjacent.filter(r => r !== this.activeCam);
+    } else {
+      allowedRooms = adjacent;
+    }
+    
+    if (allowedRooms.length === 0) return;
+
+    // Weighted movement toward BASE (player office)
     const dist    = this._distToBase();
     const maxDist = Math.max(...Object.values(dist));
-    const weights = adjacent.map(r => Math.pow(2, maxDist - (dist[r] ?? maxDist + 1) + 1));
+    const weights = allowedRooms.map(r => Math.pow(2, maxDist - (dist[r] ?? maxDist + 1) + 1));
     const total   = weights.reduce((a, b) => a + b, 0);
     let pick = Math.random() * total;
-    let next = adjacent[adjacent.length - 1];
-    for (let i = 0; i < adjacent.length; i++) {
+    let next = allowedRooms[allowedRooms.length - 1];
+    for (let i = 0; i < allowedRooms.length; i++) {
       pick -= weights[i];
-      if (pick <= 0) { next = adjacent[i]; break; }
+      if (pick <= 0) { next = allowedRooms[i]; break; }
     }
 
     this.characterRoom    = next;
@@ -637,7 +668,6 @@ class NightOneScene extends Phaser.Scene {
 
     this._updateLocationText();
     this._updateMapDot();
-    // Always refresh — image must swap even if player is already on this cam
     if (this.camOpen) this._refreshCamFeed();
   }
 
@@ -681,38 +711,6 @@ class NightOneScene extends Phaser.Scene {
         this.cooldownBar.strokeRect(barX, barY, barW, 4);
       },
     });
-  }
-
-  // Click handler for creature movement
-  _triggerCreatureMove() {
-    if (!this.aiActive || this.isStaring) return;
-
-    const adjacent = ROOM_GRAPH[this.characterRoom];
-    if (!adjacent || adjacent.length === 0) return;
-
-    // If cameras are open and viewing a specific room (not BASE), creature cannot move into that room
-    // If cameras are closed, creature can move anywhere including BASE
-    let allowedRooms;
-    if (this.camOpen && this.activeCam !== ROOM.BASE) {
-      allowedRooms = adjacent.filter(r => r !== this.activeCam);
-    } else {
-      allowedRooms = adjacent;
-    }
-    
-    if (allowedRooms.length === 0) return;
-
-    this.characterRoom = allowedRooms[Phaser.Math.Between(0, allowedRooms.length - 1)];
-    this.playerWatchStart = 0;
-    this.stareTriggered = false;
-
-    if (this.characterRoom === ROOM.BASE) {
-      this._triggerJumpscare();
-      return;
-    }
-
-    this._updateLocationText();
-    this._updateMapDot();
-    if (this.camOpen) this._refreshCamFeed();
   }
 
   // ════════════════════════════════════════════
